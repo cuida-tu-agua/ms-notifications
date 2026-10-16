@@ -5,6 +5,7 @@ using SyWater.Notifications.Api.Composition;
 using SyWater.Notifications.Api.Errors;
 using SyWater.Notifications.Api.Security;
 using SyWater.Notifications.Infrastructure.Persistence;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,7 +15,15 @@ builder.Services.AddControllers().AddJsonOptions(o =>
     o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseUpper)));
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
-builder.Services.AddOpenApi();
+// The OpenAPI document says the API lives under the gateway prefix (e.g. "/places"),
+// so "Try it out" in Swagger UI calls https://api.<domain>/places/...
+builder.Services.AddOpenApi(options => options.AddDocumentTransformer((document, context, cancellationToken) =>
+{
+    var serverUrl = builder.Configuration["OpenApi:ServerUrl"];
+    if (!string.IsNullOrWhiteSpace(serverUrl))
+        document.Servers = [new OpenApiServer { Url = serverUrl }];
+    return Task.CompletedTask;
+}));
 
 // ── Hexagon + adapters ──────────────────────────────────────────────────
 builder.Services.AddNotificationsApplication(builder.Configuration);
@@ -37,7 +46,8 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 
-if (app.Environment.IsDevelopment())
+// Development: always. Other environments: only when OpenApi:Enabled=true (set by infra).
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("OpenApi:Enabled"))
 {
     app.MapOpenApi().AllowAnonymous(); // GET /openapi/v1.json
 }
