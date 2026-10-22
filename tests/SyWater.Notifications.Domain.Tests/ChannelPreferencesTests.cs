@@ -35,4 +35,32 @@ public class ChannelPreferencesTests
         Assert.Equal(NotificationChannels.None, prefs.ChannelsFor(NotificationSeverity.Warning));
         Assert.Equal(NotificationChannels.InApp, prefs.ChannelsFor(NotificationSeverity.Info));
     }
+
+    [Theory]
+    [InlineData(NotificationSeverity.Warning)]
+    [InlineData(NotificationSeverity.Info)]
+    public void Sms_can_only_be_turned_on_for_critical_alerts(NotificationSeverity severity)
+    {
+        var prefs = ChannelPreferences.Defaults();
+
+        var error = Assert.Throws<SmsOnlyForCriticalException>(() => prefs.Set(severity, NotificationChannels.InApp | NotificationChannels.Sms));
+        Assert.Equal("preferences.sms_only_critical", error.Code);
+        Assert.False(prefs.ChannelsFor(severity).HasFlag(NotificationChannels.Sms));   // a rejected change changes nothing
+
+        prefs.Set(NotificationSeverity.Critical, NotificationChannels.InApp | NotificationChannels.Sms);
+        Assert.True(prefs.ChannelsFor(NotificationSeverity.Critical).HasFlag(NotificationChannels.Sms));
+    }
+
+    [Fact]
+    public void An_old_row_with_sms_on_a_non_critical_level_never_shows_it()
+    {
+        var prefs = ChannelPreferences.Restore(new Dictionary<NotificationSeverity, NotificationChannels>
+        {
+            [NotificationSeverity.Warning] = NotificationChannels.InApp | NotificationChannels.Sms,
+            [NotificationSeverity.Info] = NotificationChannels.All,
+        });
+
+        Assert.Equal(NotificationChannels.InApp, prefs.ChannelsFor(NotificationSeverity.Warning));
+        Assert.False(prefs.ChannelsFor(NotificationSeverity.Info).HasFlag(NotificationChannels.Sms));
+    }
 }

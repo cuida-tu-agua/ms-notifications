@@ -3,6 +3,8 @@ using SyWater.Notifications.Domain.Common;
 using SyWater.Notifications.Domain.Notifications;
 using SyWater.Notifications.Domain.Preferences;
 using SyWater.Notifications.Domain.Push;
+using SyWater.Notifications.Domain.ShortMessages;
+using SyWater.Notifications.Application.Ports.Out;
 
 namespace SyWater.Notifications.Api.Errors;
 
@@ -17,8 +19,13 @@ public sealed class DomainExceptionHandler(IProblemDetailsService problemDetails
             InvalidNotificationException e => (StatusCodes.Status400BadRequest, e.Code),
             InvalidAudienceException e => (StatusCodes.Status400BadRequest, e.Code),
             CriticalChannelRequiredException e => (StatusCodes.Status400BadRequest, e.Code),
+            SmsOnlyForCriticalException e => (StatusCodes.Status400BadRequest, e.Code),
             InvalidPushTokenException e => (StatusCodes.Status400BadRequest, e.Code),
             InvalidPushPlatformException e => (StatusCodes.Status400BadRequest, e.Code),
+            InvalidShortMessageException e => (StatusCodes.Status400BadRequest, e.Code),
+            ShortMessageRejectedException => (StatusCodes.Status422UnprocessableEntity, "sms.rejected"),
+            ShortMessageSendException => (StatusCodes.Status503ServiceUnavailable, "sms.unavailable"),
+            ShortMessagesDisabledException => (StatusCodes.Status503ServiceUnavailable, "sms.disabled"),
             UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, "auth.invalid_token"),
             _ => (0, ""),
         };
