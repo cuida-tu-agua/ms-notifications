@@ -63,8 +63,8 @@ public interface IEmailOutboxRepository
 /// <summary>Settings of the e-mail channel that the use cases need (not the SMTP ones).</summary>
 public sealed record EmailSettings(bool Enabled, string AppBaseUrl);
 
-/// <summary>HU-013/HU-032: how long a device may stay silent before it is "disconnected" (default 10 minutes).</summary>
+/// <summary>HU-013/HU-032: how long a device may stay silent before it is "disconnected" (default 1 minute: ~6 missed readings).</summary>
 public sealed record OfflineSettings(TimeSpan After)
 {
-    public static OfflineSettings Default { get; } = new(TimeSpan.FromMinutes(10));
+    public static OfflineSettings Default { get; } = new(TimeSpan.FromMinutes(1));
 }
