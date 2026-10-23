@@ -31,6 +31,22 @@ public interface ISendDueEmailsUseCase
     Task<int> ExecuteAsync(CancellationToken ct);
 }
 
+/// <summary>HU-028: sends the SMS / WhatsApp messages of the outbox that are due. Returns how many left.</summary>
+public interface ISendDueShortMessagesUseCase
+{
+    Task<int> ExecuteAsync(CancellationToken ct);
+}
+
+/// <summary>
+/// HU-028: ms-iam asks to deliver the code that verifies a phone, by the mode the user picked. Sent at once (the user is
+/// waiting for it) and never stored here.
+/// </summary>
+public interface ISendVerificationCodeUseCase
+{
+    /// <returns>The id the provider gave to the message.</returns>
+    Task<string?> ExecuteAsync(string toPhone, string? channel, string code, int validMinutes, CancellationToken ct);
+}
+
 /// <summary>HU-032: tells the owners whose device went silent. Returns how many alerts were created.</summary>
 public interface IDetectOfflineDevicesUseCase
 {
