@@ -10,7 +10,7 @@ device-service ──RabbitMQ──▶ notification.device-events ──▶ Devi
    device.valve.reported            (válvula cerrada = CRÍTICA)                         ├─ app    → notifications (bandeja)
    device.reading.received          (prueba de vida)                                    └─ correo → email_outbox ──▶ EmailDeliveryWorker ──▶ SMTP
                                                                                               (dirección: ms-iam /internal/users/{id}/contact)
-OfflineDeviceWorker (cada 60 s): dispositivo callado ≥ 10 min ──▶ alerta importante "Sensor desconectado" (una sola vez)
+OfflineDeviceWorker (cada 15 s): dispositivo callado ≥ 1 min ──▶ alerta importante "Sensor desconectado" (una sola vez)
 ```
 
 **Quién ve qué.** Una notificación es de UN usuario (`user_id`, contextual: "tu válvula se cerró") o de TODOS los de un rol (`role`, difusión). Cada persona ve las suyas más las de los roles de su token (`roles`: `USER`, `ADMIN`). La lectura es personal: que una la lea Juan no la marca leída para Ana. Pedir la de otra persona responde 404.

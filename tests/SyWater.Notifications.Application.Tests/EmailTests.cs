@@ -36,7 +36,7 @@ public class EmailTests
         Assert.Contains("ALERTA CRÍTICA", subject);
         Assert.Contains("Lugar con el dispositivo SW-1", text);
         Assert.Contains("Estado de la válvula", text);
-        Assert.Contains("2026-10-07 12:00 UTC", text);
+        Assert.Contains("2026-10-07 07:00 (hora Colombia)", text);
         Assert.Contains("Revisa el lugar y abre la válvula.", text);
         Assert.Contains($"http://app/places/{place}", text);
         Assert.Contains($"href=\"http://app/places/{place}\"", html);

@@ -3,12 +3,12 @@ using SyWater.Notifications.Application.Ports.In;
 namespace SyWater.Notifications.Api.Background;
 
 /// <summary>
-/// HU-032 "sensor desconectado": every 60 s, the devices that reported before and stayed silent longer than the
-/// threshold (default 10 min) get ONE alert. The threshold is far bigger than the period, so 60 s is plenty.
+/// HU-032 "sensor desconectado": every 15 s, the devices that reported before and stayed silent longer than the
+/// threshold (default 1 min) get ONE alert.
 /// </summary>
 public sealed class OfflineDeviceWorker(IServiceScopeFactory scopes, ILogger<OfflineDeviceWorker> logger) : BackgroundService
 {
-    private static readonly TimeSpan Every = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan Every = TimeSpan.FromSeconds(15);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
