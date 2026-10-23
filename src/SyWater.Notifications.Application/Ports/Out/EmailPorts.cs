@@ -1,9 +1,24 @@
 using SyWater.Notifications.Domain.Emails;
+using SyWater.Notifications.Domain.ShortMessages;
 
 namespace SyWater.Notifications.Application.Ports.Out;
 
-/// <summary>Where to write to a user. Comes from ms-iam; nothing is copied into our database.</summary>
-public sealed record UserContact(Guid UserId, string Email, string? FullName);
+/// <summary>
+/// Where to write to a user. Comes from ms-iam; nothing is copied into our database. The phone (E.164) is usable for
+/// SMS / WhatsApp only when it is verified, and only by the mode it was verified with (HU-028).
+/// </summary>
+public sealed record UserContact(
+    Guid UserId,
+    string Email,
+    string? FullName,
+    string? Phone = null,
+    bool PhoneVerified = false,
+    ShortMessageChannel? PhoneChannel = null)
+{
+    /// <summary>The verified phone and its mode, or null when there is nowhere to send a short message.</summary>
+    public (string Phone, ShortMessageChannel Channel)? VerifiedPhone =>
+        PhoneVerified && PhoneNumbers.IsE164(Phone) && PhoneChannel is { } channel ? (Phone!, channel) : null;
+}
 
 /// <summary>A finished mail, ready for the SMTP server.</summary>
 public sealed record EmailMessage(string ToAddress, string? ToName, string Subject, string TextBody, string HtmlBody);

@@ -2,13 +2,14 @@ using SyWater.Notifications.Application.Ports.Out;
 using SyWater.Notifications.Domain.Emails;
 using SyWater.Notifications.Domain.Notifications;
 using SyWater.Notifications.Domain.Preferences;
+using SyWater.Notifications.Domain.ShortMessages;
 
 namespace SyWater.Notifications.Application.UseCases;
 
 /// <summary>
 /// Where a freshly created notification goes, according to the channels its owner chose for its urgency
 /// level (HU-034). In-app = the notification center; e-mail = queued in the outbox (HU-027); push = Expo, sent now
-/// to every phone of the user (HU-026).
+/// to every phone of the user (HU-026); SMS / WhatsApp = queued in the sms outbox, CRITICAL only (HU-028).
 /// Every step is idempotent, so a redelivered event can safely run the whole thing again.
 /// </summary>
 public sealed class NotificationDispatcher(
@@ -17,13 +18,15 @@ public sealed class NotificationDispatcher(
     IEmailOutboxRepository outbox,
     EmailSettings email,
     PushNotifier push,
-    TimeProvider clock)
+    TimeProvider clock,
+    ISmsOutboxRepository? smsOutbox = null,
+    SmsSettings? sms = null)
 {
     /// <summary>
     /// Stores it in-app if the user keeps that channel (CRITICAL always does) and queues the mail if they want
     /// it. A broadcast to a role is not personal: it is always stored in-app and never mailed.
     /// </summary>
-    /// <returns>The channels the user wants that this service did not deliver (SMS, and push while it is switched off).</returns>
+    /// <returns>The channels the user wants that this service did not deliver (SMS while it is switched off, push likewise).</returns>
     public async Task<NotificationChannels> DispatchAsync(Notification notification, DeliveryContext context, CancellationToken ct)
     {
         if (notification.Audience.UserId is not { } userId)
@@ -33,8 +36,8 @@ public sealed class NotificationDispatcher(
         }
 
         var channels = (await preferences.GetAsync(userId, ct)).ChannelsFor(notification.Severity);
-
         var isNew = true;
+
         if (channels.HasFlag(NotificationChannels.InApp))
             isNew = await notifications.AddAsync(notification, ct);
 
@@ -49,7 +52,19 @@ public sealed class NotificationDispatcher(
         if (channels.HasFlag(NotificationChannels.Push) && isNew)
             await push.NotifyAsync(userId, notification, ct);
 
-        var notDelivered = NotificationChannels.Sms | (push.Enabled ? NotificationChannels.None : NotificationChannels.Push);
+        // HU-028: only CRITICAL alerts go by SMS / WhatsApp; the outbox is idempotent per (source event, user)
+        var smsQueued = false;
+        if (channels.HasFlag(NotificationChannels.Sms) && notification.Severity == NotificationSeverity.Critical
+            && sms is { Enabled: true } && smsOutbox is not null)
+        {
+            await smsOutbox.AddAsync(
+                SmsOutboxItem.Queue(userId, notification.SourceEventId, ShortMessageComposer.ForAlert(notification, context),
+                    clock.GetUtcNow().UtcDateTime), ct);
+            smsQueued = true;
+        }
+
+        var notDelivered = (smsQueued ? NotificationChannels.None : NotificationChannels.Sms)
+                           | (push.Enabled ? NotificationChannels.None : NotificationChannels.Push);
         return channels & notDelivered;
     }
 }

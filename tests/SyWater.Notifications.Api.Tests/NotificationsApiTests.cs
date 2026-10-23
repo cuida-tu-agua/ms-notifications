@@ -167,6 +167,22 @@ public sealed class NotificationsApiTests : IDisposable
         Assert.Equal("preferences.critical_requires_in_app", await Title(response));
     }
 
+    [Theory]
+    [InlineData("WARNING")]
+    [InlineData("info")]
+    public async Task Sms_on_a_non_critical_level_is_400_and_reads_back_off(string level)
+    {
+        var client = Client(Guid.NewGuid(), Roles.User);
+
+        var response = await client.PutAsJsonAsync($"/api/notification-preferences/{level}", new { inApp = true, push = true, email = false, sms = true });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("preferences.sms_only_critical", await Title(response));
+        var levels = (await client.GetFromJsonAsync<JsonElement>("/api/notification-preferences")).GetProperty("levels").EnumerateArray().ToList();
+        Assert.All(levels.Where(l => l.GetProperty("severity").GetString() != "CRITICAL"), l => Assert.False(l.GetProperty("sms").GetBoolean()));
+        Assert.True(levels.Single(l => l.GetProperty("severity").GetString() == "CRITICAL").GetProperty("sms").GetBoolean());
+    }
+
     [Fact]
     public async Task A_phone_registers_and_unregisters_its_push_token()
     {

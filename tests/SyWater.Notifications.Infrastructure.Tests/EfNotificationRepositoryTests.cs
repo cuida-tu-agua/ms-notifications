@@ -220,9 +220,9 @@ public sealed class EfNotificationPreferenceRepositoryTests : IDisposable
     {
         var channels = SyWater.Notifications.Domain.Preferences.NotificationChannels.InApp;
         await Repo().SaveAsync(_user, NotificationSeverity.Info, SyWater.Notifications.Domain.Preferences.NotificationChannels.None, Now, default);
-        await Repo().SaveAsync(_user, NotificationSeverity.Info, channels | SyWater.Notifications.Domain.Preferences.NotificationChannels.Sms, Now, default);
+        await Repo().SaveAsync(_user, NotificationSeverity.Info, channels | SyWater.Notifications.Domain.Preferences.NotificationChannels.Push, Now, default);
 
-        Assert.Equal(channels | SyWater.Notifications.Domain.Preferences.NotificationChannels.Sms,
+        Assert.Equal(channels | SyWater.Notifications.Domain.Preferences.NotificationChannels.Push,
             (await Repo().GetAsync(_user, default)).ChannelsFor(NotificationSeverity.Info));
         Assert.Equal(channels, (await Repo().GetAsync(Guid.NewGuid(), default)).ChannelsFor(NotificationSeverity.Info));
     }

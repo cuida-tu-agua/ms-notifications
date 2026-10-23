@@ -95,7 +95,7 @@ public class PreferenceTests
         var external = await Dispatcher().DispatchAsync(Personal(NotificationSeverity.Critical), new DeliveryContext("Lugar de prueba"), default);
 
         Assert.Single(_notifications.All);
-        Assert.Equal(NotificationChannels.Push | NotificationChannels.Sms, external);   // push + SMS have no adapter yet
+        Assert.Equal(NotificationChannels.Push | NotificationChannels.Sms, external);   // push and SMS are switched off in this dispatcher (see ShortMessageTests for SMS on)
         Assert.Single(_outbox.All);                                                    // the e-mail is queued
     }
 
