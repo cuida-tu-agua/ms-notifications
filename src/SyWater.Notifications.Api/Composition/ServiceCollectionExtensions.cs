@@ -35,7 +35,19 @@ public static class ServiceCollectionExtensions
             : throw new InvalidOperationException($"Unknown 'Sms:Provider' '{provider}'. Use twilio, mailpit or leave it empty.");
     }
 
-    public static bool SmsEnabled(IConfiguration config) => SmsProvider(config) != "";
+    /// <summary>
+    /// HU-028: WhatsApp:Provider = "meta" (WhatsApp Cloud API of Meta, section "Meta") · empty = WhatsApp goes by the same
+    /// provider as SMS (Sms:Provider). With "meta" and an empty Sms:Provider only WhatsApp works.
+    /// </summary>
+    public static string WhatsAppProvider(IConfiguration config)
+    {
+        var provider = (config["WhatsApp:Provider"] ?? "").Trim().ToLowerInvariant();
+        return provider is "" or "meta"
+            ? provider
+            : throw new InvalidOperationException($"Unknown 'WhatsApp:Provider' '{provider}'. Use meta or leave it empty.");
+    }
+
+    public static bool SmsEnabled(IConfiguration config) => SmsProvider(config) != "" || WhatsAppProvider(config) != "";
 
     public static IServiceCollection AddNotificationsApplication(this IServiceCollection services, IConfiguration config)
     {
@@ -61,6 +73,13 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISendDueShortMessagesUseCase, SendDueShortMessagesUseCase>();
         services.AddScoped<ISendVerificationCodeUseCase, SendVerificationCodeUseCase>();
         services.AddScoped<IDetectOfflineDevicesUseCase, DetectOfflineDevicesUseCase>();
+        services.AddScoped<MessageTexts>();
+        services.AddScoped<IListMessageTemplatesUseCase, ListMessageTemplatesUseCase>();
+        services.AddScoped<IUpdateMessageTemplateUseCase, UpdateMessageTemplateUseCase>();
+        services.AddScoped<IResetMessageTemplateUseCase, ResetMessageTemplateUseCase>();
+        services.AddScoped<IGetSharedMessageTemplateUseCase, GetSharedMessageTemplateUseCase>();
+        services.AddScoped<INotifyCollaboratorInvitationUseCase, NotifyCollaboratorInvitationUseCase>();
+        services.AddScoped<INotifyInvitationAnsweredUseCase, NotifyInvitationAnsweredUseCase>();
         return services;
     }
 
@@ -91,6 +110,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEmailOutboxRepository, EfEmailOutboxRepository>();
         services.AddScoped<IPushTokenRepository, EfPushTokenRepository>();
         services.AddScoped<ISmsOutboxRepository, EfSmsOutboxRepository>();
+        services.AddScoped<IMessageTemplateRepository, EfMessageTemplateRepository>();
 
         services.AddHttpClient<IPushSender, ExpoPushSender>(http =>
         {
@@ -132,9 +152,13 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    /// <summary>HU-028: the adapter of Sms:Provider (see <see cref="SmsProvider"/>).</summary>
+    /// <summary>
+    /// HU-028: the adapter of Sms:Provider (see <see cref="SmsProvider"/>) and, when WhatsApp:Provider is "meta", the
+    /// WhatsApp Cloud API of Meta for the WhatsApp messages (each mode by its own provider).
+    /// </summary>
     private static void AddShortMessageSender(IServiceCollection services, IConfiguration config)
     {
+        Type? smsSender = null;
         switch (SmsProvider(config))
         {
             case "twilio":
@@ -144,22 +168,43 @@ public static class ServiceCollectionExtensions
                 if (string.IsNullOrWhiteSpace(twilio["SmsFrom"]) && string.IsNullOrWhiteSpace(twilio["WhatsAppFrom"]))
                     throw new InvalidOperationException("Sms:Provider is twilio: set 'Twilio:SmsFrom' and/or 'Twilio:WhatsAppFrom'.");
                 services.Configure<TwilioOptions>(twilio);
-                services.AddHttpClient<IShortMessageSender, TwilioShortMessageSender>(http =>
+                services.AddHttpClient<TwilioShortMessageSender>(http =>
                 {
                     var options = twilio.Get<TwilioOptions>() ?? new TwilioOptions();
                     Configure(http, options.BaseUrl);
                     http.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
                 });
+                smsSender = typeof(TwilioShortMessageSender);
                 break;
             case "mailpit":
                 if (!EmailEnabled(config))
                     throw new InvalidOperationException("Sms:Provider is mailpit: it needs 'Smtp:Host' (the fake SMS are mails in Mailpit).");
-                services.AddSingleton<IShortMessageSender, MailpitShortMessageSender>();
-                break;
-            default:
-                services.AddSingleton<IShortMessageSender, DisabledShortMessageSender>();
+                services.AddSingleton<MailpitShortMessageSender>();
+                smsSender = typeof(MailpitShortMessageSender);
                 break;
         }
+
+        if (WhatsAppProvider(config) != "meta")
+        {
+            if (smsSender is null) services.AddSingleton<IShortMessageSender, DisabledShortMessageSender>();
+            else services.AddTransient(typeof(IShortMessageSender), sp => sp.GetRequiredService(smsSender));
+            return;
+        }
+
+        var meta = config.GetSection(MetaWhatsAppOptions.Section);
+        if (string.IsNullOrWhiteSpace(meta["AccessToken"]) || string.IsNullOrWhiteSpace(meta["PhoneNumberId"]))
+            throw new InvalidOperationException(
+                "WhatsApp:Provider is meta: set 'Meta:AccessToken' and 'Meta:PhoneNumberId' (WhatsApp > API Setup of the Meta app; infra .env).");
+        services.Configure<MetaWhatsAppOptions>(meta);
+        services.AddHttpClient<MetaWhatsAppSender>(http =>
+        {
+            var options = meta.Get<MetaWhatsAppOptions>() ?? new MetaWhatsAppOptions();
+            Configure(http, options.BaseUrl);
+            http.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        });
+        services.AddTransient<IShortMessageSender>(sp => new ChannelRoutingShortMessageSender(
+            smsSender is null ? null : (IShortMessageSender)sp.GetRequiredService(smsSender),
+            sp.GetRequiredService<MetaWhatsAppSender>()));
     }
 
     private static string Required(IConfiguration config, string key) =>

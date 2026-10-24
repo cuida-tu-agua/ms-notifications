@@ -33,7 +33,8 @@ builder.Services.AddNotificationsBackground(builder.Configuration);
 // ── Security: every endpoint requires a valid ms-iam token unless marked AllowAnonymous ──
 builder.Services.AddIamJwtAuthentication(builder.Configuration, builder.Environment);
 builder.Services.AddAuthorizationBuilder()
-    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
+    .AddPolicy(AuthorizationPolicies.Admin, policy => policy.RequireClaim("roles", AuthorizationPolicies.AdminRole));
 
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [])

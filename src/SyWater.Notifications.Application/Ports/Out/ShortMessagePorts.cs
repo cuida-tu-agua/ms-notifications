@@ -2,13 +2,21 @@ using SyWater.Notifications.Domain.ShortMessages;
 
 namespace SyWater.Notifications.Application.Ports.Out;
 
-/// <summary>A finished short message: E.164 phone, mode and text (the adapter adapts the text to SMS when needed).</summary>
-public sealed record ShortMessage(string ToPhone, ShortMessageChannel Channel, string Body);
+/// <summary>What a short message is. The WhatsApp adapter of Meta picks the approved template from it (a code goes with the
+/// authentication template, the rest with the general one); SMS ignores it.</summary>
+public enum ShortMessageKind { Notice, VerificationCode }
 
-/// <summary>Twilio in production, Mailpit in development (each message becomes a mail to look at).</summary>
+/// <summary>
+/// A finished short message: E.164 phone, mode and text (the adapter adapts the text to SMS when needed). Code is the bare
+/// verification code when <see cref="Kind"/> is VerificationCode.
+/// </summary>
+public sealed record ShortMessage(string ToPhone, ShortMessageChannel Channel, string Body,
+    ShortMessageKind Kind = ShortMessageKind.Notice, string? Code = null);
+
+/// <summary>WhatsApp Cloud API of Meta and / or Twilio in production, Mailpit in development (each message becomes a mail to look at).</summary>
 public interface IShortMessageSender
 {
-    /// <returns>The id the provider gave to the message (Twilio SID), for traceability.</returns>
+    /// <returns>The id the provider gave to the message (Meta wamid, Twilio SID), for traceability.</returns>
     /// <exception cref="ShortMessageSendException">The provider failed for now: try again later.</exception>
     /// <exception cref="ShortMessageRejectedException">The provider refused this number or mode for good.</exception>
     Task<string?> SendAsync(ShortMessage message, CancellationToken ct);

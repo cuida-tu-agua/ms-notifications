@@ -46,6 +46,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("Jwt:PublicKeyPath", _publicKeyPath);
         builder.UseSetting("RabbitMq:Host", "");   // no consumer: the tests call the handler directly
         builder.UseSetting("Internal:ApiKey", "test-internal-key-0123456789");   // the e-mail channel is on in Development (Mailpit)
+        builder.UseSetting("Services:PlacesBaseUrl", "");   // no ms-places here: only the owner hears about the alerts (HU-047 has its own tests)
 
         builder.ConfigureTestServices(services =>
         {
