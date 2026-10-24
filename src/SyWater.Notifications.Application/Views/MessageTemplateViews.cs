@@ -26,8 +26,10 @@ public sealed record InvitationNoticeView(bool InApp, bool ShortMessageQueued);
 /// <param name="Problem">sms_disabled · no_verified_phone · rejected (the provider refused it for good) · unavailable (try later).</param>
 /// <param name="Detail">The reason the provider gave (e.g. "Meta 400 (131030): Recipient phone number not in allowed list").</param>
 /// <param name="Body">The text that was sent.</param>
+/// <param name="DeliveryStatus">What the provider said a few seconds later (Twilio: queued, sent, delivered, read...); null if it cannot tell.</param>
 public sealed record TestMessageView(
-    bool Sent, string? Channel, string? MaskedPhone, string? ProviderMessageId, string? Problem, string? Detail, string? Body)
+    bool Sent, string? Channel, string? MaskedPhone, string? ProviderMessageId, string? Problem, string? Detail, string? Body,
+    string? DeliveryStatus = null)
 {
     public static TestMessageView Failed(string problem, string? detail) => new(false, null, null, null, problem, detail, null);
 }
@@ -35,3 +37,6 @@ public sealed record TestMessageView(
 /// <param name="Sms">twilio · mailpit · "" (off).</param>
 /// <param name="WhatsApp">meta · twilio · mailpit · "" (off).</param>
 public sealed record ShortMessageProvidersView(string Sms, string WhatsApp, bool WhatsAppTemplate);
+
+/// <param name="Channels">WHATSAPP and / or SMS, in the order the app should offer them.</param>
+public sealed record ShortMessageChannelsView(IReadOnlyList<string> Channels);

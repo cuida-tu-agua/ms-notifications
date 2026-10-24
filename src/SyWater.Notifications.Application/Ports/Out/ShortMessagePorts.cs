@@ -53,3 +53,24 @@ public interface ISmsOutboxRepository
 
 /// <summary>Whether the SMS / WhatsApp channel is on (a provider is configured).</summary>
 public sealed record SmsSettings(bool Enabled);
+
+/// <summary>
+/// What the provider says about a message after accepting it. Twilio takes a WhatsApp at once and reports later that it
+/// failed (free text outside the 24 h window, a number without WhatsApp...): this is how the admin's test finds out.
+/// </summary>
+public sealed record ShortMessageStatus(string Status, bool Failed, bool Final, string? Error)
+{
+    public static ShortMessageStatus From(string status, string? error)
+    {
+        var s = (status ?? "").Trim().ToLowerInvariant();
+        var failed = s is "failed" or "undelivered" or "canceled";
+        return new ShortMessageStatus(s, failed, failed || s is "delivered" or "read", error);
+    }
+}
+
+/// <summary>Reads the delivery status of a message the provider already accepted (only Twilio offers it here).</summary>
+public interface IShortMessageStatusReader
+{
+    /// <returns>Null when the id is not of this provider or it cannot be read right now.</returns>
+    Task<ShortMessageStatus?> ReadAsync(string providerMessageId, CancellationToken ct);
+}

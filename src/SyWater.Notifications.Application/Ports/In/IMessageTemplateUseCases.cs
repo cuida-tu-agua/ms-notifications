@@ -40,3 +40,9 @@ public interface IGetShortMessageProvidersUseCase
 {
     ShortMessageProvidersView Execute();
 }
+
+/// <summary>The modes (WHATSAPP / SMS) that can really reach a phone in this environment.</summary>
+public interface IGetShortMessageChannelsUseCase
+{
+    ShortMessageChannelsView Execute();
+}

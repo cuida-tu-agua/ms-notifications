@@ -12,7 +12,8 @@ namespace SyWater.Notifications.Application.UseCases;
 /// the answer carries the reason the provider gave instead of failing.
 /// </summary>
 public sealed class SendTestMessageUseCase(
-    IShortMessageSender sender, SmsSettings settings, MessageTexts texts, IUserContactDirectory? contacts = null)
+    IShortMessageSender sender, SmsSettings settings, MessageTexts texts, IUserContactDirectory? contacts = null,
+    IShortMessageStatusReader? statuses = null, TestStatusPolling? polling = null)
     : ISendTestMessageUseCase
 {
     public const string TestPrefix = "(Prueba) ";
@@ -44,7 +45,10 @@ public sealed class SendTestMessageUseCase(
         try
         {
             var id = await sender.SendAsync(message, ct);
-            return new TestMessageView(true, channel, masked, id, null, null, body);
+            var status = await FollowAsync(id, ct);
+            return status is { Failed: true }
+                ? new TestMessageView(false, channel, masked, id, "rejected", status.Error ?? status.Status, body, status.Status)
+                : new TestMessageView(true, channel, masked, id, null, null, body, status?.Status);
         }
         catch (ShortMessageRejectedException ex)
         {
@@ -58,6 +62,28 @@ public sealed class SendTestMessageUseCase(
         {
             return new TestMessageView(false, channel, masked, null, "sms_disabled", null, body);
         }
+    }
+
+    // Twilio reports a WhatsApp failure a moment after accepting it: wait a little for the final status
+    private async Task<ShortMessageStatus?> FollowAsync(string? providerMessageId, CancellationToken ct)
+    {
+        if (statuses is null || string.IsNullOrWhiteSpace(providerMessageId)) return null;
+        var every = polling ?? TestStatusPolling.Default;
+        ShortMessageStatus? last = null;
+        for (var attempt = 0; attempt < every.Attempts; attempt++)
+        {
+            if (attempt > 0 || every.FirstWait) await Task.Delay(every.Every, ct);
+            try
+            {
+                last = await statuses.ReadAsync(providerMessageId, ct) ?? last;
+            }
+            catch (ShortMessageSendException)
+            {
+                // the status could not be read now: the message was accepted anyway
+            }
+            if (last is { Final: true }) break;
+        }
+        return last;
     }
 
     public const string SampleCode = "123456";
@@ -76,10 +102,31 @@ public sealed class SendTestMessageUseCase(
     };
 }
 
+/// <summary>How long the admin's test waits for the delivery status (4 reads, 2 s apart).</summary>
+public sealed record TestStatusPolling(int Attempts, TimeSpan Every, bool FirstWait = true)
+{
+    public static TestStatusPolling Default { get; } = new(4, TimeSpan.FromSeconds(2));
+}
+
 /// <summary>Which provider each mode uses right now (the admin sees whether WhatsApp is real or simulated).</summary>
 public sealed class GetShortMessageProvidersUseCase(ShortMessageProviders providers) : IGetShortMessageProvidersUseCase
 {
     public ShortMessageProvidersView Execute() => new(providers.Sms, providers.WhatsApp, providers.WhatsAppTemplate);
+}
+
+/// <summary>
+/// The modes a user may pick when verifying the phone: only the ones that can really arrive here (HU-028). Without
+/// SMS configured the app offers WhatsApp only.
+/// </summary>
+public sealed class GetShortMessageChannelsUseCase(ShortMessageProviders providers) : IGetShortMessageChannelsUseCase
+{
+    public ShortMessageChannelsView Execute()
+    {
+        var channels = new List<string>();
+        if (providers.WhatsApp != "") channels.Add(ShortMessageChannel.WhatsApp.ToCode());
+        if (providers.Sms != "") channels.Add(ShortMessageChannel.Sms.ToCode());
+        return new ShortMessageChannelsView(channels);
+    }
 }
 
 /// <param name="Sms">twilio · mailpit · "" (off).</param>

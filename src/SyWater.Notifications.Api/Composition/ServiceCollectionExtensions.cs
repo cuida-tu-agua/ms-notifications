@@ -47,6 +47,26 @@ public static class ServiceCollectionExtensions
             : throw new InvalidOperationException($"Unknown 'WhatsApp:Provider' '{provider}'. Use meta or leave it empty.");
     }
 
+    /// <summary>
+    /// The provider each mode really uses: Twilio only counts for a mode whose sender is configured (no Twilio:SmsFrom =
+    /// no SMS, so nobody can pick a mode that would never arrive or would cost US$0.06–0.34 per message).
+    /// </summary>
+    public static ShortMessageProviders ActiveProviders(IConfiguration config)
+    {
+        var sms = SmsProvider(config);
+        var twilioSms = !string.IsNullOrWhiteSpace(config["Twilio:SmsFrom"]);
+        var twilioWhatsApp = !string.IsNullOrWhiteSpace(config["Twilio:WhatsAppFrom"]);
+        var smsMode = sms == "twilio" && !twilioSms ? "" : sms;
+        var whatsApp = WhatsAppProvider(config) == "meta" ? "meta" : sms == "twilio" && !twilioWhatsApp ? "" : sms;
+        var template = whatsApp switch
+        {
+            "meta" => !string.IsNullOrWhiteSpace(config["Meta:TemplateName"]),
+            "twilio" => !string.IsNullOrWhiteSpace(config["Twilio:WhatsAppTemplateSid"]),
+            _ => false,
+        };
+        return new ShortMessageProviders(smsMode, whatsApp, template);
+    }
+
     public static bool SmsEnabled(IConfiguration config) => SmsProvider(config) != "" || WhatsAppProvider(config) != "";
 
     public static IServiceCollection AddNotificationsApplication(this IServiceCollection services, IConfiguration config)
@@ -82,10 +102,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<INotifyInvitationAnsweredUseCase, NotifyInvitationAnsweredUseCase>();
         services.AddScoped<ISendTestMessageUseCase, SendTestMessageUseCase>();
         services.AddSingleton<IGetShortMessageProvidersUseCase, GetShortMessageProvidersUseCase>();
-        services.AddSingleton(new ShortMessageProviders(
-            SmsProvider(config),
-            WhatsAppProvider(config) == "" ? SmsProvider(config) : WhatsAppProvider(config),
-            WhatsAppProvider(config) == "meta" && !string.IsNullOrWhiteSpace(config["Meta:TemplateName"])));
+        services.AddSingleton<IGetShortMessageChannelsUseCase, GetShortMessageChannelsUseCase>();
+        services.AddSingleton(ActiveProviders(config));
         return services;
     }
 
@@ -181,6 +199,8 @@ public static class ServiceCollectionExtensions
                     http.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
                 });
                 smsSender = typeof(TwilioShortMessageSender);
+                // Twilio tells later whether a WhatsApp failed: the admin's test reads it
+                services.AddTransient<IShortMessageStatusReader>(sp => sp.GetRequiredService<TwilioShortMessageSender>());
                 break;
             case "mailpit":
                 if (!EmailEnabled(config))

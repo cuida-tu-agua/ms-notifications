@@ -63,6 +63,17 @@ public sealed class MessageTemplatesController : ControllerBase
         Ok(await useCase.ExecuteAsync(key, ct));
 }
 
+/// <summary>HU-028 · What the app may offer when a user verifies the phone (any signed-in user).</summary>
+[ApiController]
+[Route("api/short-messages")]
+public sealed class ShortMessagesController : ControllerBase
+{
+    /// <summary>{"channels":["WHATSAPP","SMS"]}: only the modes that can really reach a phone here.</summary>
+    [HttpGet("channels")]
+    public ActionResult<ShortMessageChannelsView> Channels([FromServices] IGetShortMessageChannelsUseCase useCase) =>
+        Ok(useCase.Execute());
+}
+
 /// <summary>Service-to-service only (X-Internal-Key): ms-places tells about invitations to collaborate (HU-042, HU-043).</summary>
 [ApiController]
 [AllowAnonymous]
