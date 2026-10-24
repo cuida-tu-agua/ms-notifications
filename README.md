@@ -33,6 +33,8 @@ Se entregan **app**, **correo**, **push** y **SMS/WhatsApp** (HU-028, solo alert
 
 **Correo.** Se escribe en una cola (`email_outbox`) junto con la notificación, así que un SMTP caído no pierde la alerta: se reintenta a 1 min, 5 min, 15 min y 1 h; a la 5.ª falla queda `FAILED`. La dirección no se guarda: se pide a ms-iam al enviar. Un evento repetido no manda dos correos. Con `Smtp:Host` vacío el canal queda apagado.
 
+**Colaboradores (HU-047).** Las alertas de válvula cerrada (crítica) y de sensor desconectado (importante) también llegan a los colaboradores a quienes el dueño dio el permiso `VIEW_ALERTS`. ms-places es quien sabe quién es colaborador, así que se le pregunta en cada alerta: quien pierde el acceso deja de recibirlas de inmediato. Cada colaborador usa sus propias preferencias de canales y el mismo evento no le llega dos veces. Si ms-places no responde, el evento se reintenta (la alerta del dueño ya salió y el resto es idempotente); el aviso de sensor desconectado se reintenta en el siguiente barrido.
+
 **Sensor desconectado.** Solo para dispositivos que ya reportaron alguna vez (uno que nunca reportó se ve como "Nunca ha reportado", HU-013). Umbral `Devices:OfflineAfterMinutes` (10 por defecto). Una alerta hasta que el dispositivo reporte de nuevo.
 
 ## Endpoints (JWT de ms-iam)
@@ -73,6 +75,7 @@ En desarrollo el correo sale por Mailpit (`localhost:1025`, ver http://localhost
 | `Smtp:FromAddress` / `FromName` | remitente (debe estar autorizado en el proveedor) | `no-reply@cuidatuagua.com` |
 | `Jwt:Issuer` + `keys/iam-public.pem` | los mismos que ms-iam | |
 | `Redis:Configuration` | el mismo Redis de ms-iam (revocación de tokens) | |
+| `Services:PlacesBaseUrl` | HU-047: para saber qué colaboradores tienen el permiso `VIEW_ALERTS` de un lugar (ms-places `GET /internal/places/{id}/recipients`). Si falta, solo se avisa al dueño | |
 | `Services:IamBaseUrl`, `Internal:ApiKey` | para pedir el correo y el teléfono verificado del usuario a ms-iam; la clave también protege `/internal/**` | |
 | `Devices:OfflineAfterMinutes` | umbral de "sensor desconectado" | `10` |
 | `RabbitMq:*` | broker; con `Host` vacío no consume eventos | |

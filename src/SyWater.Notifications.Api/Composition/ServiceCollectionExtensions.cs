@@ -119,6 +119,15 @@ public static class ServiceCollectionExtensions
                 .AddTypedClient<IUserContactDirectory>((http, _) => new HttpUserContactDirectory(http, internalKey));
         }
 
+        // HU-047: collaborators with VIEW_ALERTS also get the alerts. Without ms-places configured only the owner is told.
+        var placesUrl = config["Services:PlacesBaseUrl"];
+        var sharedKey = config["Internal:ApiKey"];
+        if (!string.IsNullOrWhiteSpace(placesUrl) && sharedKey is { Length: >= 24 })
+        {
+            services.AddHttpClient(HttpPlaceAlertRecipients.ServiceName, http => Configure(http, placesUrl))
+                .AddTypedClient<IPlaceAlertRecipients>((http, _) => new HttpPlaceAlertRecipients(http, sharedKey));
+        }
+
         AddShortMessageSender(services, config);
         return services;
     }
