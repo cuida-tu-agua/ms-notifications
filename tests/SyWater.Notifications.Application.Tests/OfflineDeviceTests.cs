@@ -19,7 +19,7 @@ public class OfflineDeviceTests
 
     private NotificationDispatcher Dispatcher() => new(_notifications, _prefs, _outbox, new EmailSettings(true, "http://app"), TestPush.Off(), _clock);
     private DeviceEventsHandler Handler() => new(_devices, Dispatcher(), _clock);
-    private DetectOfflineDevicesUseCase Detector() => new(_devices, Dispatcher(), OfflineSettings.Default, _clock);
+      private DetectOfflineDevicesUseCase Detector() => new(_devices, Dispatcher(), new OfflineSettings(TimeSpan.FromMinutes(10)), _clock);
 
     /// <summary>A reading received <paramref name="minutesFromStart"/> after the test started (links the device the first time).</summary>
     private async Task ReadingAt(int minutesFromStart)
@@ -50,7 +50,7 @@ public class OfflineDeviceTests
         Assert.Equal(_user, alert.Audience.UserId);
         Assert.Equal(NotificationSeverity.Warning, alert.Severity);   // important: app + push
         Assert.Equal(_place, alert.PlaceId);
-        Assert.Contains("2026-10-07 12:00 UTC", alert.Body);          // says when it was last heard
+        Assert.Contains("2026-10-07 07:00 (hora Colombia)", alert.Body);   // says when it was last heard
         Assert.Contains("SW-ESP32-000001", alert.Body);
         Assert.Empty(_outbox.All);                                    // important alerts are not mailed by default
     }

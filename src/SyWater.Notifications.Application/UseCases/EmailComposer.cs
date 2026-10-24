@@ -28,7 +28,7 @@ public static class EmailComposer
             _ => "Anuncio",
         };
         var place = string.IsNullOrWhiteSpace(context.PlaceLabel) ? "Tu lugar" : context.PlaceLabel.Trim();
-        var when = $"{n.CreatedAt:yyyy-MM-dd HH:mm} UTC";
+        var when = LocalTime.Format(n.CreatedAt);
         var link = Link(appBaseUrl, n.PlaceId);
 
         var subject = $"[Cuida Tu Agua] {level}: {n.Title}";
