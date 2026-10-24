@@ -7,10 +7,12 @@ using SyWater.Notifications.Domain.Notifications;
 namespace SyWater.Notifications.Application.UseCases;
 
 /// <summary>
-/// Turns device events into notifications for the owner of the place. Every handler is idempotent:
-/// RabbitMQ may deliver an event twice or out of order, and the result must be the same.
+/// Turns device events into notifications for the owner of the place (and, for the alerts, for the collaborators who
+/// may receive them, HU-047). Every handler is idempotent: RabbitMQ may deliver an event twice or out of order, and the
+/// result must be the same.
 /// </summary>
-public sealed class DeviceEventsHandler(IPlaceDeviceRepository devices, NotificationDispatcher dispatcher, TimeProvider clock)
+public sealed class DeviceEventsHandler(
+    IPlaceDeviceRepository devices, NotificationDispatcher dispatcher, TimeProvider clock, IPlaceAlertRecipients? recipients = null)
     : IDeviceEventsHandler
 {
     /// <summary>HU-012: the owner learns that the device is linked; and from now on we know who owns the place.</summary>
@@ -57,6 +59,11 @@ public sealed class DeviceEventsHandler(IPlaceDeviceRepository devices, Notifica
                 await Notify(device.UserId, NotificationType.ValveChanged, NotificationSeverity.Critical, "Válvula cerrada",
                     "El paso del agua de tu lugar se cerró y el lugar quedó sin agua. Si no fuiste tú, revisa el historial de la válvula y ábrela desde la app cuando sea seguro.",
                     e.PlaceId, eventId, now, Label(device.SerialNumber), ct);
+                // HU-047: the collaborators with VIEW_ALERTS also learn the place lost its water. If ms-places does not
+                // answer the event is retried: the owner's notification is already stored and the rest is idempotent.
+                await NotifyCollaborators(device.UserId, e.PlaceId, NotificationType.ValveChanged, NotificationSeverity.Critical, "Válvula cerrada",
+                    "El paso del agua de un lugar compartido contigo se cerró y el lugar quedó sin agua. Revisa el historial de la válvula.",
+                    eventId, now, Label(device.SerialNumber), ct);
                 break;
             case ValveChange.Opened:
                 await Notify(device.UserId, NotificationType.ValveChanged, NotificationSeverity.Info, "Válvula abierta",
@@ -82,6 +89,15 @@ public sealed class DeviceEventsHandler(IPlaceDeviceRepository devices, Notifica
     private static string Label(string serial) => $"Lugar con el dispositivo {serial}";
 
     private DateTime Now() => clock.GetUtcNow().UtcDateTime;
+
+    private async Task NotifyCollaborators(Guid ownerId, Guid placeId, NotificationType type, NotificationSeverity severity,
+        string title, string body, string eventId, DateTime now, string? placeLabel, CancellationToken ct)
+    {
+        if (recipients is null) return;
+        foreach (var collaboratorId in await recipients.CollaboratorsWithAlertsAsync(placeId, ct))
+            if (collaboratorId != ownerId)
+                await Notify(collaboratorId, type, severity, title, body, placeId, eventId, now, placeLabel, ct);
+    }
 
     private Task Notify(Guid userId, NotificationType type, NotificationSeverity severity, string title, string body,
         Guid placeId, string eventId, DateTime now, string? placeLabel, CancellationToken ct) =>
