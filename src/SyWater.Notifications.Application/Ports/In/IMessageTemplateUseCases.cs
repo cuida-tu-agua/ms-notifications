@@ -28,3 +28,15 @@ public interface IGetSharedMessageTemplateUseCase
 {
     Task<MessageTemplateView> ExecuteAsync(string key, CancellationToken ct);
 }
+
+/// <summary>The admin sends one message of a text to their own verified phone, with example data, to check the provider.</summary>
+public interface ISendTestMessageUseCase
+{
+    Task<TestMessageView> ExecuteAsync(Guid adminId, string key, CancellationToken ct);
+}
+
+/// <summary>Which provider SMS and WhatsApp use in this environment.</summary>
+public interface IGetShortMessageProvidersUseCase
+{
+    ShortMessageProvidersView Execute();
+}

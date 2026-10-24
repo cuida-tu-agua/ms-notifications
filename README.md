@@ -59,6 +59,8 @@ Se entregan **app**, **correo**, **push** y **SMS/WhatsApp** (HU-028, solo alert
 | GET | `/api/admin/message-templates` | **solo ADMIN**: los textos de WhatsApp / SMS con su texto por defecto y sus datos `{...}` |
 | PUT | `/api/admin/message-templates/{key}` `{body}` | **solo ADMIN**: guarda el texto (aplica al siguiente mensaje). 400 `message_template.invalid` · 404 `message_template.not_found`. Guardar el texto por defecto lo restaura |
 | DELETE | `/api/admin/message-templates/{key}` | **solo ADMIN**: vuelve al texto por defecto |
+| POST | `/api/admin/message-templates/{key}/test` | **solo ADMIN**: envía ya ese texto, con datos de ejemplo y el prefijo "(Prueba)", al celular verificado del propio admin. 200 `{sent,channel,maskedPhone,providerMessageId,problem,detail,body}`: `problem` = `sms_disabled` · `no_verified_phone` · `rejected` · `unavailable` y `detail` trae el motivo del proveedor (p. ej. `Meta 401 (190): Invalid OAuth access token`) |
+| GET | `/api/admin/message-templates/providers` | **solo ADMIN**: `{sms,whatsApp,whatsAppTemplate}`: qué proveedor usa cada modo (`meta`, `twilio`, `mailpit` = simulado, vacío = apagado) |
 | GET | `/api/message-templates/GUEST_LINK_SHARE` | cualquier usuario: el texto con que el dueño comparte el enlace de invitado por WhatsApp (el resto de textos responde 404) |
 | POST | `/internal/invitations` `{invitationId,placeId,placeName,inviteeUserId,invitedByName,permissions,expiresAt}` | **solo servicios** (`X-Internal-Key`): ms-places avisa una invitación. 202 `{inApp,shortMessageQueued}` (nada si `inviteeUserId` es null: solo correo) |
 | POST | `/internal/invitations/answered` `{invitationId,placeId,placeName,ownerId,inviteeName,accepted}` | **solo servicios**: el dueño se entera de la respuesta. 202 |

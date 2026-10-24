@@ -82,6 +82,39 @@ public sealed class MessageTemplatesApiTests : IDisposable
     }
 
     [Fact]
+    public async Task The_admin_sends_a_test_to_their_own_phone_and_sees_which_provider_is_on()
+    {
+        var adminId = Guid.NewGuid();
+        _factory.Contacts.Known[adminId] = new UserContact(adminId, "admin@mail.com", "Ada", "+573001112233", true,
+            SyWater.Notifications.Domain.ShortMessages.ShortMessageChannel.WhatsApp);
+        var sms = new FakeShortMessages();
+        var client = _factory.WithWebHostBuilder(b =>
+        {
+            b.UseSetting("Sms:Provider", "mailpit");
+            b.ConfigureTestServices(s =>
+            {
+                s.RemoveAll<IShortMessageSender>();
+                s.AddSingleton<IShortMessageSender>(sms);
+            });
+        }).CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _factory.TokenFor(adminId, Roles.Admin));
+
+        var test = await client.PostAsync($"{Admin}/ALERT_CRITICAL/test", null);
+        Assert.Equal(HttpStatusCode.OK, test.StatusCode);
+        var result = await test.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(result.GetProperty("sent").GetBoolean());
+        Assert.Equal("+57300***233", result.GetProperty("maskedPhone").GetString());
+        Assert.StartsWith("(Prueba) ", Assert.Single(sms.Sent).Body);
+
+        var providers = await client.GetFromJsonAsync<JsonElement>($"{Admin}/providers");
+        Assert.Equal("mailpit", providers.GetProperty("sms").GetString());
+        Assert.Equal("mailpit", providers.GetProperty("whatsApp").GetString());
+
+        var user = Client(Guid.NewGuid(), Roles.User);
+        Assert.Equal(HttpStatusCode.Forbidden, (await user.PostAsync($"{Admin}/ALERT_CRITICAL/test", null)).StatusCode);
+    }
+
+    [Fact]
     public async Task Any_user_reads_the_guest_link_text_but_not_the_admin_ones()
     {
         var user = Client(Guid.NewGuid(), Roles.User);

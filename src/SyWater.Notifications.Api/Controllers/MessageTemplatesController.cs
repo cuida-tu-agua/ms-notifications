@@ -35,6 +35,20 @@ public sealed class AdminMessageTemplatesController : ControllerBase
         string key, [FromServices] IResetMessageTemplateUseCase useCase, CancellationToken ct) =>
         Ok(await useCase.ExecuteAsync(key, ct));
 
+    /// <summary>
+    /// Sends this text, with example data, to the admin's own verified phone right now. 200 always (unless the key does
+    /// not exist): "sent" says whether the provider took it and "detail" carries the reason it gave when it did not.
+    /// </summary>
+    [HttpPost("{key}/test")]
+    public async Task<ActionResult<TestMessageView>> Test(
+        string key, [FromServices] ISendTestMessageUseCase useCase, CancellationToken ct) =>
+        Ok(await useCase.ExecuteAsync(User.GetRequester().UserId, key, ct));
+
+    /// <summary>Which provider SMS and WhatsApp use in this environment (real Meta or simulated in Mailpit).</summary>
+    [HttpGet("providers")]
+    public ActionResult<ShortMessageProvidersView> Providers([FromServices] IGetShortMessageProvidersUseCase useCase) =>
+        Ok(useCase.Execute());
+
     public sealed record SaveMessageTemplateRequest(string? Body);
 }
 

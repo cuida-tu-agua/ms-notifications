@@ -80,6 +80,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IGetSharedMessageTemplateUseCase, GetSharedMessageTemplateUseCase>();
         services.AddScoped<INotifyCollaboratorInvitationUseCase, NotifyCollaboratorInvitationUseCase>();
         services.AddScoped<INotifyInvitationAnsweredUseCase, NotifyInvitationAnsweredUseCase>();
+        services.AddScoped<ISendTestMessageUseCase, SendTestMessageUseCase>();
+        services.AddSingleton<IGetShortMessageProvidersUseCase, GetShortMessageProvidersUseCase>();
+        services.AddSingleton(new ShortMessageProviders(
+            SmsProvider(config),
+            WhatsAppProvider(config) == "" ? SmsProvider(config) : WhatsAppProvider(config),
+            WhatsAppProvider(config) == "meta" && !string.IsNullOrWhiteSpace(config["Meta:TemplateName"])));
         return services;
     }
 
