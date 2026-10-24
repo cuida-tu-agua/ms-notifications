@@ -48,7 +48,7 @@ public sealed class DetectOfflineDevicesUseCase(
                         await dispatcher.DispatchAsync(
                             Notification.Create(Audience.ForUser(collaboratorId), NotificationType.DeviceOffline, NotificationSeverity.Warning,
                                 "Sensor desconectado",
-                                $"El medidor de un lugar compartido contigo no reporta desde {lastSeen:yyyy-MM-dd HH:mm} UTC (hace {minutes} min).",
+                                $"El medidor de un lugar compartido contigo no reporta desde {LocalTime.Format(lastSeen)} (hace {minutes} min).",
                                 device.PlaceId, notification.SourceEventId, now),
                             context, ct);
                     }
