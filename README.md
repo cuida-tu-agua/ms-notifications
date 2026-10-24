@@ -102,7 +102,7 @@ En desarrollo el correo sale por Mailpit (`localhost:1025`, ver http://localhost
 | `Twilio:AccountSid` / `Twilio:AuthToken` | cuenta de Twilio. El token va en secretos, nunca en git | |
 | `Twilio:SmsFrom` / `Twilio:WhatsAppFrom` | número de Twilio que envía SMS y remitente de WhatsApp (E.164). Al menos uno | `+1…`, `+14155238886` (sandbox) |
 | `Twilio:WhatsAppTemplateSid` / `Twilio:CodeTemplateSid` | opcionales: Content SID (`HX…`) de una plantilla de WhatsApp aprobada con UNA variable `{{1}}` (mensajes a cualquier hora) y de una de autenticación para el código. Sin `Twilio:SmsFrom` no hay SMS: la app solo ofrece WhatsApp | `HX…` |
-| `WhatsApp:Provider` | `meta` = WhatsApp por la Cloud API de Meta (SMS sigue por `Sms:Provider`) · vacío = WhatsApp va con `Sms:Provider` | `meta` |
+| `WhatsApp:Provider` | `meta` = WhatsApp por la Cloud API de Meta · `twilio` = WhatsApp por Twilio (`Twilio:WhatsAppFrom`) · vacío = WhatsApp va con `Sms:Provider`. El SMS siempre sigue a `Sms:Provider` | `meta`, `twilio` |
 | `Meta:AccessToken` / `Meta:PhoneNumberId` | app de Meta → WhatsApp → API Setup. El token va en secretos, nunca en git | |
 | `Meta:TemplateName` / `Meta:CodeTemplateName` / `Meta:TemplateLanguage` | opcionales: plantilla Utility con una variable `{{1}}` (mensajes en cualquier momento) y plantilla de autenticación para el código | `alerta_cuida_tu_agua`, `codigo_verificacion`, `es` |
 

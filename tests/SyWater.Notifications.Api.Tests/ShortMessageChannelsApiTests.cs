@@ -47,4 +47,33 @@ public sealed class ShortMessageChannelsApiTests : IDisposable
         Assert.Equal("mailpit", meta.Sms);
         Assert.Equal("meta", meta.WhatsApp);
     }
+
+    [Fact]
+    public void WhatsApp_by_Twilio_can_go_with_SMS_simulated_in_Mailpit()
+    {
+        var p = ServiceCollectionExtensions.ActiveProviders(Config(
+            ("Sms:Provider", "mailpit"), ("WhatsApp:Provider", "twilio"), ("Twilio:WhatsAppFrom", "+16187025507"), ("Twilio:WhatsAppTemplateSid", "HXa")));
+        Assert.Equal("mailpit", p.Sms);
+        Assert.Equal("twilio", p.WhatsApp);
+        Assert.True(p.WhatsAppTemplate);
+    }
+
+    [Fact]
+    public async Task The_app_starts_with_WhatsApp_by_Twilio_and_says_so()
+    {
+        var client = _factory.WithWebHostBuilder(b =>
+        {
+            b.UseSetting("Sms:Provider", "mailpit");
+            b.UseSetting("WhatsApp:Provider", "twilio");
+            b.UseSetting("Twilio:AccountSid", "ACtest");
+            b.UseSetting("Twilio:AuthToken", "secret");
+            b.UseSetting("Twilio:WhatsAppFrom", "+16187025507");
+        }).CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _factory.TokenFor(Guid.NewGuid(), Roles.Admin));
+
+        var providers = await client.GetFromJsonAsync<JsonElement>("/api/admin/message-templates/providers");
+
+        Assert.Equal("twilio", providers.GetProperty("whatsApp").GetString());
+        Assert.Equal("mailpit", providers.GetProperty("sms").GetString());
+    }
 }

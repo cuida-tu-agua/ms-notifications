@@ -36,15 +36,15 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// HU-028: WhatsApp:Provider = "meta" (WhatsApp Cloud API of Meta, section "Meta") · empty = WhatsApp goes by the same
-    /// provider as SMS (Sms:Provider). With "meta" and an empty Sms:Provider only WhatsApp works.
+    /// HU-028: WhatsApp:Provider = "meta" (WhatsApp Cloud API of Meta, section "Meta") · "twilio" (section "Twilio", sender
+    /// Twilio:WhatsAppFrom) · empty = WhatsApp goes by the same provider as SMS (Sms:Provider). SMS always follows Sms:Provider.
     /// </summary>
     public static string WhatsAppProvider(IConfiguration config)
     {
         var provider = (config["WhatsApp:Provider"] ?? "").Trim().ToLowerInvariant();
-        return provider is "" or "meta"
+        return provider is "" or "meta" or "twilio"
             ? provider
-            : throw new InvalidOperationException($"Unknown 'WhatsApp:Provider' '{provider}'. Use meta or leave it empty.");
+            : throw new InvalidOperationException($"Unknown 'WhatsApp:Provider' '{provider}'. Use meta, twilio or leave it empty.");
     }
 
     /// <summary>
@@ -57,7 +57,12 @@ public static class ServiceCollectionExtensions
         var twilioSms = !string.IsNullOrWhiteSpace(config["Twilio:SmsFrom"]);
         var twilioWhatsApp = !string.IsNullOrWhiteSpace(config["Twilio:WhatsAppFrom"]);
         var smsMode = sms == "twilio" && !twilioSms ? "" : sms;
-        var whatsApp = WhatsAppProvider(config) == "meta" ? "meta" : sms == "twilio" && !twilioWhatsApp ? "" : sms;
+        var whatsApp = WhatsAppProvider(config) switch
+        {
+            "meta" => "meta",
+            "twilio" => twilioWhatsApp ? "twilio" : "",
+            _ => sms == "twilio" && !twilioWhatsApp ? "" : sms,
+        };
         var template = whatsApp switch
         {
             "meta" => !string.IsNullOrWhiteSpace(config["Meta:TemplateName"]),
@@ -183,24 +188,29 @@ public static class ServiceCollectionExtensions
     private static void AddShortMessageSender(IServiceCollection services, IConfiguration config)
     {
         Type? smsSender = null;
+        var twilioWanted = SmsProvider(config) == "twilio" || WhatsAppProvider(config) == "twilio";
+        if (twilioWanted)
+        {
+            var twilio = config.GetSection(TwilioOptions.Section);
+            if (string.IsNullOrWhiteSpace(twilio["AccountSid"]) || string.IsNullOrWhiteSpace(twilio["AuthToken"]))
+                throw new InvalidOperationException("Twilio is used: set 'Twilio:AccountSid' and 'Twilio:AuthToken' (user-secrets / infra .env).");
+            if (string.IsNullOrWhiteSpace(twilio["SmsFrom"]) && string.IsNullOrWhiteSpace(twilio["WhatsAppFrom"]))
+                throw new InvalidOperationException("Twilio is used: set 'Twilio:SmsFrom' and/or 'Twilio:WhatsAppFrom'.");
+            services.Configure<TwilioOptions>(twilio);
+            services.AddHttpClient<TwilioShortMessageSender>(http =>
+            {
+                var options = twilio.Get<TwilioOptions>() ?? new TwilioOptions();
+                Configure(http, options.BaseUrl);
+                http.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            });
+            // Twilio tells later whether a WhatsApp failed: the admin's test reads it
+            services.AddTransient<IShortMessageStatusReader>(sp => sp.GetRequiredService<TwilioShortMessageSender>());
+        }
+
         switch (SmsProvider(config))
         {
             case "twilio":
-                var twilio = config.GetSection(TwilioOptions.Section);
-                if (string.IsNullOrWhiteSpace(twilio["AccountSid"]) || string.IsNullOrWhiteSpace(twilio["AuthToken"]))
-                    throw new InvalidOperationException("Sms:Provider is twilio: set 'Twilio:AccountSid' and 'Twilio:AuthToken' (user-secrets / infra .env).");
-                if (string.IsNullOrWhiteSpace(twilio["SmsFrom"]) && string.IsNullOrWhiteSpace(twilio["WhatsAppFrom"]))
-                    throw new InvalidOperationException("Sms:Provider is twilio: set 'Twilio:SmsFrom' and/or 'Twilio:WhatsAppFrom'.");
-                services.Configure<TwilioOptions>(twilio);
-                services.AddHttpClient<TwilioShortMessageSender>(http =>
-                {
-                    var options = twilio.Get<TwilioOptions>() ?? new TwilioOptions();
-                    Configure(http, options.BaseUrl);
-                    http.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-                });
                 smsSender = typeof(TwilioShortMessageSender);
-                // Twilio tells later whether a WhatsApp failed: the admin's test reads it
-                services.AddTransient<IShortMessageStatusReader>(sp => sp.GetRequiredService<TwilioShortMessageSender>());
                 break;
             case "mailpit":
                 if (!EmailEnabled(config))
@@ -208,6 +218,15 @@ public static class ServiceCollectionExtensions
                 services.AddSingleton<MailpitShortMessageSender>();
                 smsSender = typeof(MailpitShortMessageSender);
                 break;
+        }
+
+        if (WhatsAppProvider(config) == "twilio")
+        {
+            // WhatsApp by Twilio, SMS by Sms:Provider (Mailpit in development, Twilio, or off)
+            services.AddTransient<IShortMessageSender>(sp => new ChannelRoutingShortMessageSender(
+                smsSender is null ? null : (IShortMessageSender)sp.GetRequiredService(smsSender),
+                sp.GetRequiredService<TwilioShortMessageSender>()));
+            return;
         }
 
         if (WhatsAppProvider(config) != "meta")
