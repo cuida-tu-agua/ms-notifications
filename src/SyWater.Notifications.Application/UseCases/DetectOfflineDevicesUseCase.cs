@@ -5,7 +5,7 @@ using SyWater.Notifications.Domain.Notifications;
 namespace SyWater.Notifications.Application.UseCases;
 
 /// <summary>
-/// HU-032: a device that reported before and has been silent for the threshold (default 10 min) → ONE "sensor
+/// HU-032: a device that reported before and has been silent for the threshold (default 1 min) → ONE "sensor
 /// disconnected" alert (important: in-app + push by default) that says when it was last heard. No more alerts
 /// until it reports again.
 /// </summary>
@@ -30,7 +30,7 @@ public sealed class DetectOfflineDevicesUseCase(
             var notification = Notification.Create(
                 Audience.ForUser(device.UserId), NotificationType.DeviceOffline, NotificationSeverity.Warning,
                 "Sensor desconectado",
-                $"Tu dispositivo {device.SerialNumber} no reporta desde {lastSeen:yyyy-MM-dd HH:mm} UTC (hace {minutes} min). " +
+                $"Tu dispositivo {device.SerialNumber} no reporta desde {LocalTime.Format(lastSeen)} (hace {minutes} min). " +
                 "Revisa que tenga energía y conexión WiFi.",
                 device.PlaceId, $"offline:{device.DeviceId:N}:{lastSeen:yyyyMMddHHmmss}", now);
             var context = new DeliveryContext($"Lugar con el dispositivo {device.SerialNumber}");
@@ -48,7 +48,7 @@ public sealed class DetectOfflineDevicesUseCase(
                         await dispatcher.DispatchAsync(
                             Notification.Create(Audience.ForUser(collaboratorId), NotificationType.DeviceOffline, NotificationSeverity.Warning,
                                 "Sensor desconectado",
-                                $"El medidor de un lugar compartido contigo no reporta desde {lastSeen:yyyy-MM-dd HH:mm} UTC (hace {minutes} min).",
+                                $"El medidor de un lugar compartido contigo no reporta desde {LocalTime.Format(lastSeen)} (hace {minutes} min).",
                                 device.PlaceId, notification.SourceEventId, now),
                             context, ct);
                     }

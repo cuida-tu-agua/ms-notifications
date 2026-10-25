@@ -83,7 +83,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(new SmsSettings(SmsEnabled(config)));
         services.AddSingleton(SmsRetryPolicy.Default);
         services.AddScoped<PushNotifier>();
-        services.AddSingleton(new OfflineSettings(TimeSpan.FromMinutes(config.GetValue("Devices:OfflineAfterMinutes", 10))));
+        services.AddSingleton(new OfflineSettings(TimeSpan.FromMinutes(config.GetValue("Devices:OfflineAfterMinutes", 1))));
         services.AddScoped<IListMyNotificationsUseCase, ListMyNotificationsUseCase>();
         services.AddScoped<IGetUnreadCountUseCase, GetUnreadCountUseCase>();
         services.AddScoped<IMarkNotificationReadUseCase, MarkNotificationReadUseCase>();
