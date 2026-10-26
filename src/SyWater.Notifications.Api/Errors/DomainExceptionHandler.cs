@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics;
 using SyWater.Notifications.Domain.Common;
+using SyWater.Notifications.Domain.Messages;
 using SyWater.Notifications.Domain.Notifications;
 using SyWater.Notifications.Domain.Preferences;
 using SyWater.Notifications.Domain.Push;
@@ -26,6 +27,9 @@ public sealed class DomainExceptionHandler(IProblemDetailsService problemDetails
             ShortMessageRejectedException => (StatusCodes.Status422UnprocessableEntity, "sms.rejected"),
             ShortMessageSendException => (StatusCodes.Status503ServiceUnavailable, "sms.unavailable"),
             ShortMessagesDisabledException => (StatusCodes.Status503ServiceUnavailable, "sms.disabled"),
+            InvalidMessageTemplateException e => (StatusCodes.Status400BadRequest, e.Code),
+            MessageTemplateNotFoundException e => (StatusCodes.Status404NotFound, e.Code),
+            ExternalServiceUnavailableException => (StatusCodes.Status503ServiceUnavailable, "service.unavailable"),
             UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, "auth.invalid_token"),
             _ => (0, ""),
         };

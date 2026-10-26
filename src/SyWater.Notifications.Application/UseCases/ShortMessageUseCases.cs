@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using SyWater.Notifications.Application.Ports.In;
 using SyWater.Notifications.Application.Ports.Out;
+using SyWater.Notifications.Domain.Messages;
 using SyWater.Notifications.Domain.ShortMessages;
 
 namespace SyWater.Notifications.Application.UseCases;
@@ -59,7 +60,8 @@ public sealed class SendDueShortMessagesUseCase(
 /// HU-028: delivers the code that verifies a phone by the mode the user picked, so a number that does not work for that
 /// mode can never be verified with it. ms-iam generates, stores and checks the code; this service only delivers it.
 /// </summary>
-public sealed partial class SendVerificationCodeUseCase(IShortMessageSender sender, SmsSettings settings) : ISendVerificationCodeUseCase
+public sealed partial class SendVerificationCodeUseCase(IShortMessageSender sender, SmsSettings settings, MessageTexts? texts = null)
+    : ISendVerificationCodeUseCase
 {
     [GeneratedRegex(@"^[0-9]{6}$")]
     private static partial Regex SixDigits();
@@ -72,6 +74,8 @@ public sealed partial class SendVerificationCodeUseCase(IShortMessageSender send
         if (validMinutes is < 1 or > 60) throw new InvalidShortMessageException("The code must be valid between 1 and 60 minutes.");
         if (!settings.Enabled) throw new ShortMessagesDisabledException();
 
-        return await sender.SendAsync(new ShortMessage(toPhone, mode, ShortMessageComposer.ForVerificationCode(code, validMinutes)), ct);
+        var template = await (texts ?? MessageTexts.Defaults).GetAsync(MessageTemplateKey.PhoneCode, ct);
+        return await sender.SendAsync(
+            new ShortMessage(toPhone, mode, ShortMessageComposer.ForVerificationCode(code, validMinutes, template), ShortMessageKind.VerificationCode, code), ct);
     }
 }

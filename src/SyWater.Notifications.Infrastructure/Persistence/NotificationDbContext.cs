@@ -13,6 +13,7 @@ public class NotificationDbContext(DbContextOptions options) : DbContext(options
     public DbSet<EmailOutboxEntity> EmailOutbox => Set<EmailOutboxEntity>();
     public DbSet<PushTokenEntity> PushTokens => Set<PushTokenEntity>();
     public DbSet<SmsOutboxEntity> SmsOutbox => Set<SmsOutboxEntity>();
+    public DbSet<MessageTemplateEntity> MessageTemplates => Set<MessageTemplateEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
