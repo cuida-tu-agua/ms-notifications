@@ -1,5 +1,6 @@
 using SyWater.Notifications.Application.Ports.Out;
 using SyWater.Notifications.Domain.Emails;
+using SyWater.Notifications.Domain.Messages;
 using SyWater.Notifications.Domain.Notifications;
 using SyWater.Notifications.Domain.Preferences;
 using SyWater.Notifications.Domain.ShortMessages;
@@ -20,14 +21,16 @@ public sealed class NotificationDispatcher(
     PushNotifier push,
     TimeProvider clock,
     ISmsOutboxRepository? smsOutbox = null,
-    SmsSettings? sms = null)
+    SmsSettings? sms = null,
+    MessageTexts? texts = null)
 {
     /// <summary>
     /// Stores it in-app if the user keeps that channel (CRITICAL always does) and queues the mail if they want
     /// it. A broadcast to a role is not personal: it is always stored in-app and never mailed.
     /// </summary>
     /// <returns>The channels the user wants that this service did not deliver (SMS while it is switched off, push likewise).</returns>
-    public async Task<NotificationChannels> DispatchAsync(Notification notification, DeliveryContext context, CancellationToken ct)
+    public async Task<NotificationChannels> DispatchAsync(Notification notification, DeliveryContext context, CancellationToken ct,
+        DispatchOptions? options = null)
     {
         if (notification.Audience.UserId is not { } userId)
         {
@@ -41,7 +44,7 @@ public sealed class NotificationDispatcher(
         if (channels.HasFlag(NotificationChannels.InApp))
             isNew = await notifications.AddAsync(notification, ct);
 
-        if (channels.HasFlag(NotificationChannels.Email) && email.Enabled)
+        if (channels.HasFlag(NotificationChannels.Email) && email.Enabled && options is not { SkipEmail: true })
         {
             var (subject, text, html) = EmailComposer.Compose(notification, context, email.AppBaseUrl);
             await outbox.AddAsync(
@@ -57,8 +60,9 @@ public sealed class NotificationDispatcher(
         if (channels.HasFlag(NotificationChannels.Sms) && notification.Severity == NotificationSeverity.Critical
             && sms is { Enabled: true } && smsOutbox is not null)
         {
+            var template = await (texts ?? MessageTexts.Defaults).GetAsync(MessageTemplateKey.AlertCritical, ct);
             await smsOutbox.AddAsync(
-                SmsOutboxItem.Queue(userId, notification.SourceEventId, ShortMessageComposer.ForAlert(notification, context),
+                SmsOutboxItem.Queue(userId, notification.SourceEventId, ShortMessageComposer.ForAlert(notification, context, template),
                     clock.GetUtcNow().UtcDateTime), ct);
             smsQueued = true;
         }
@@ -68,3 +72,6 @@ public sealed class NotificationDispatcher(
         return channels & notDelivered;
     }
 }
+
+/// <summary>How a dispatch differs from the usual one. SkipEmail: the person already got a mail about it (an invitation is mailed by ms-iam).</summary>
+public sealed record DispatchOptions(bool SkipEmail = false);

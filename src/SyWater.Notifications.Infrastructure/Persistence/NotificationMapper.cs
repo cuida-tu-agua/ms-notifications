@@ -30,6 +30,8 @@ internal static class NotificationMapper
         NotificationType.DeviceUnlinked => "DEVICE_UNLINKED",
         NotificationType.ValveChanged => "VALVE_CHANGED",
         NotificationType.DeviceOffline => "DEVICE_OFFLINE",
+        NotificationType.CollaboratorInvitation => "COLLABORATOR_INVITATION",
+        NotificationType.InvitationAnswered => "INVITATION_ANSWERED",
         _ => "SYSTEM_ANNOUNCEMENT",
     };
 
@@ -46,6 +48,8 @@ internal static class NotificationMapper
         "DEVICE_UNLINKED" => NotificationType.DeviceUnlinked,
         "VALVE_CHANGED" => NotificationType.ValveChanged,
         "DEVICE_OFFLINE" => NotificationType.DeviceOffline,
+        "COLLABORATOR_INVITATION" => NotificationType.CollaboratorInvitation,
+        "INVITATION_ANSWERED" => NotificationType.InvitationAnswered,
         _ => NotificationType.SystemAnnouncement,
     };
 
